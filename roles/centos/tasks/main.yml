@@ -1,0 +1,90 @@
+- name: installation reqs packages of nagios
+  tags: reqs
+  dnf:
+    name:
+      - python2-pip
+      - php
+      - autoconf
+      - automake
+      - wget
+      - httpd
+      - make
+      - net-snmp
+      - openssl-devel
+      - net-snmp-utils
+      - gcc
+      - gd
+      - gd-devel
+      - glibc
+      - gettext
+      - glibc-common
+      - perl
+    state: latest
+    update_cache: true
+
+- name: installation of password hashing library python package
+  pip:
+    name: passlib
+
+
+- name: creating a dir for installed files
+  file:
+    path: ~/nagios
+    state: directory
+
+- name: installing the nagios
+  unarchive:
+    src: https://github.com/NagiosEnterprises/nagioscore/archive/nagios-4.4.6.tar.gz
+    dest: ~/nagios
+    remote_src: yes
+    mode: 0777
+    owner: root
+    group: root
+
+- name: creating users and groups
+  shell: |
+    cd ~/nagios/nagioscore-**
+    ./configure
+    make all
+    make install-groups-users
+    usermod -a -G nagios www-data
+    make install
+    make install-daemoninit
+    make install-commandmode
+    make install-config
+    make install-webconf
+
+- name: installing nagios plugins
+  unarchive:
+    src: https://github.com/nagios-plugins/nagios-plugins/archive/release-2.3.3.tar.gz
+    dest: ~/nagios
+    remote_src: yes
+    mode: 0777
+    owner: root
+    group: root
+
+- name: installing nagios
+  shell: |
+    cd ~/nagios/nagios-plugins*
+    ./tools/setup
+    ./configure
+    make
+    make install
+
+- name: creating user in the password file
+  community.general.htpasswd:
+    path: /usr/local/nagios/etc/htpsswd.users
+    name: nanquil
+    password: 123456789
+
+- name: restarting nagios
+  service:
+    name: nagios
+    state: restarted
+    enabled: true
+
+- name: restarting httpd
+  service:
+    name: httpd
+    state: restarted
+    enabled: true

@@ -1,0 +1,98 @@
+- name: installation reqs packages of nagios
+  tags: reqs
+  apt:
+    name:
+      - python3
+      - python3-pip
+      - apache2
+      - php
+      - autoconf
+      - unzip
+      - wget
+      - make
+      - gcc
+      - libc6
+      - openssl
+      - build-essential
+      - snmp
+      - dc
+      - bc
+      - gawk
+      - gettext
+      - libapache2-mod-php
+      - libssl-dev
+      - libgd-dev
+      - libmcrypt-dev
+      - libnet-snmp-perl
+    state: latest
+    update_cache: true
+
+
+- name: installation of password hashing library python package
+  pip:
+    name: passlib
+
+
+- name: creating a dir for installed files
+  file:
+    path: ~/nagios
+    state: directory
+
+- name: installing the nagios
+  unarchive:
+    src: https://github.com/NagiosEnterprises/nagioscore/archive/nagios-4.4.6.tar.gz
+    dest: ~/nagios
+    remote_src: yes
+    mode: 0755
+    owner: root
+    group: root
+
+- name: creating users and groups
+  shell: |
+    cd ~/nagios/nagioscore-*
+    sudo ./configure --with-httpd-conf=/etc/apache2/sites-enabled
+    sudo make all
+    sudo make install-groups-users
+    sudo usermod -a -G nagios www-data
+    sudo make install
+    sudo make install-daemoninit
+    sudo make install-commandmode
+    sudo make install-config
+    sudo make install-webconf
+    sudo a2enmod rewrite
+    sudo a2enmod cgi
+
+- name: installing nagios plugins
+  unarchive:
+    src: https://github.com/nagios-plugins/nagios-plugins/archive/release-2.3.3.tar.gz
+    dest: ~/nagios
+    remote_src: yes
+    mode: 0755
+    owner: root
+    group: root
+
+- name: installing nagios
+  shell: |
+    cd ~/nagios/nagios-plugins*
+    ./tools/setup
+    ./configure
+    make
+    make install
+
+- name: creating user in the password file
+  community.general.htpasswd:
+    path: /usr/local/nagios/etc/htpsswd.users
+    name: nanquil
+    password: 123456789
+
+- name: restarting nagios
+  service:
+    name: nagios
+    state: restarted
+    enabled: true
+
+- name: restarting httpd
+  service:
+    name: apache2
+    state: restarted
+    enabled: true
